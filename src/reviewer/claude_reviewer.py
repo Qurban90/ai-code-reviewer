@@ -36,6 +36,14 @@ class ClaudeReviewer:
         dependencies: int = 0,
     ) -> FileReview:
         """Review a single file and return structured output."""
+        if len(code) > 50000:
+            return FileReview(
+                filename=filename,
+                issues=[],
+                summary="File too large for review (>50k chars)",
+                overall_score=0,
+            )
+        
         prompt = self._build_prompt(filename, code, ast_analysis, dependencies)
         
         for attempt in range(self.max_retries):
@@ -101,13 +109,13 @@ class ClaudeReviewer:
             logger.error(f"Validation error: {e}")
             return self._error_review(filename, f"Invalid schema: {e}")
     
-    def _error_review(self, filename: str, error_msg: str) -> FileReview:
-     return FileReview(
-        filename=filename,
-        overall_score=0,  # minimum valid score
-        summary=f"Review failed: {error_msg}",
-        issues=[],
-    )
+    def _error_review(self, filename: str, message: str) -> FileReview:
+        return FileReview(
+            filename=filename,
+            issues=[],
+            summary=f"Review failed: {message}",
+            overall_score=0,
+        )
     
     def estimate_cost(self, code: str) -> dict:
         """Rough token + cost estimate."""
