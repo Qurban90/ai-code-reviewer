@@ -44,6 +44,11 @@ class ReviewOrchestrator:
         self.max_files = max_files
         self.enable_ai = enable_ai
         self.claude = None
+        self.poster = None
+        try:
+            self.poster = CommentPoster()
+        except ValueError as e:
+            logger.warning(f"Comment poster disabled: {e}")
         if enable_ai:
             try:
                 self.claude = ClaudeReviewer()
@@ -74,7 +79,21 @@ class ReviewOrchestrator:
         self._step_priority(ctx)
         self._step_cache_filter(ctx)
         self._step_review(ctx)
+        self._step_post_comments(ctx)
         return ctx
+    def _step_post_comments(self, ctx: PRReviewContext) -> None:
+        """Mərhələ 6: Review-ləri GitHub PR-a post et."""
+        logger.info("Step 6: Post comments")
+
+        if not self.poster or not ctx.reviews:
+            return
+
+        try:
+            result = self.poster.post_review(ctx.repo, ctx.pr_number, ctx.reviews)
+            ctx.comment_result = result
+            logger.info(f"Posted: {result}")
+        except Exception as e:
+            ctx.errors.append(f"Comment posting error: {e}")
     def _step_review(self, ctx: PRReviewContext) -> None:
         """Mərhələ 5: Claude AI ilə review."""
         logger.info("Step 5: AI review")
