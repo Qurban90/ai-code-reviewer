@@ -13,7 +13,7 @@ from src.priority.prioritizer import ReviewPrioritizer, FileMetrics, Prioritized
 from src.cache.review_cache import ReviewCache
 from src.reviewer.claude_reviewer import ClaudeReviewer
 from src.reviewer.models import FileReview
-
+from src.github_integration.comment_poster import CommentPoster
 logger = logging.getLogger(__name__)
 
 
@@ -30,7 +30,7 @@ class PRReviewContext:
     review_order: List[PrioritizedFile] = field(default_factory=list)
     cached_files: List[str] = field(default_factory=list)
     files_to_review: List[str] = field(default_factory=list)
-    
+    comment_result: Optional[dict] = None
     errors: List[str] = field(default_factory=list)
     reviews: Dict[str, FileReview] = field(default_factory=dict)
 

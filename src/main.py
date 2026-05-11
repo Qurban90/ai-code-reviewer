@@ -128,7 +128,14 @@ def display_review_context(ctx) -> None:
         console.print(f"\n[cyan]To review with AI:[/cyan] {len(ctx.files_to_review)}")
         for f in ctx.files_to_review:
             console.print(f"  → {f}")
-    
+    if ctx.reviews:
+        console.print(f"\n[green]AI Reviews:[/green]")
+        for fname, review in ctx.reviews.items():
+            color = "green" if review.overall_score >= 7 else "yellow" if review.overall_score >= 4 else "red"
+            console.print(
+                f"  [{color}]●[/{color}] {fname}: {review.overall_score}/10 — "
+                f"{len(review.issues)} issues — {review.summary[:80]}"
+            )
     console.print(f"[bold cyan]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold cyan]\n")
 
 
