@@ -11,7 +11,8 @@ from src.parsers.ast_analyzer import ASTAnalyzer, FileAnalysis
 from src.graph.dependency_graph import DependencyGraphBuilder, GraphAnalysis
 from src.priority.prioritizer import ReviewPrioritizer, FileMetrics, PrioritizedFile
 from src.cache.review_cache import ReviewCache
-
+from src.reviewer.claude_reviewer import ClaudeReviewer
+from src.reviewer.models import FileReview
 
 logger = logging.getLogger(__name__)
 
@@ -31,16 +32,24 @@ class PRReviewContext:
     files_to_review: List[str] = field(default_factory=list)
     
     errors: List[str] = field(default_factory=list)
-
+    reviews: Dict[str, FileReview] = field(default_factory=dict)
 
 class ReviewOrchestrator:
     """PR review pipeline-ı idarə edir."""
     
-    def __init__(self, cache_dir: str = "review_cache", max_files: int = 5):
+    def __init__(self, cache_dir: str = "review_cache", max_files: int = 5, enable_ai: bool = True):
         self.ast_analyzer = ASTAnalyzer()
         self.graph_builder = DependencyGraphBuilder()
         self.cache = ReviewCache(cache_dir=cache_dir)
         self.max_files = max_files
+        self.enable_ai = enable_ai
+        self.claude = None
+        if enable_ai:
+            try:
+                self.claude = ClaudeReviewer()
+            except ValueError as e:
+                logger.warning(f"Claude disabled: {e}")
+                self.enable_ai = False
     
     def process_pr(
         self,
@@ -64,9 +73,41 @@ class ReviewOrchestrator:
         self._step_graph(ctx)
         self._step_priority(ctx)
         self._step_cache_filter(ctx)
-        
+        self._step_review(ctx)
         return ctx
-    
+    def _step_review(self, ctx: PRReviewContext) -> None:
+        """Mərhələ 5: Claude AI ilə review."""
+        logger.info("Step 5: AI review")
+        
+        if not self.enable_ai or not self.claude:
+            logger.info("AI disabled, skipping")
+            return
+        
+        for pf in ctx.review_order:
+            filename = pf.filename
+            code = ctx.files.get(filename, "")
+            
+            cached = self.cache.get(code)
+            if cached:
+                try:
+                    ctx.reviews[filename] = FileReview(**cached.review_data)
+                    continue
+                except Exception:
+                    pass
+            
+            ast_result = ctx.ast_results.get(filename)
+            try:
+                review = self.claude.review_file(
+                    filename=filename,
+                    code=code,
+                    ast_analysis=ast_result,
+                    dependencies=pf.dependencies,
+                )
+                ctx.reviews[filename] = review
+                
+                self.cache.set(code, review.model_dump())
+            except Exception as e:
+                ctx.errors.append(f"Review error in {filename}: {e}")
     def _step_ast(self, ctx: PRReviewContext) -> None:
         """Mərhələ 1: hər faylı AST ilə analiz et."""
         logger.info("Step 1: AST analysis")

@@ -5,6 +5,7 @@ omit =
     src/graph/sample_project/*
     src/parsers/test_sample.py
     src/*/__init__.py
+    src/reviewer/prompts.pys
 
 [report]
 exclude_lines =
